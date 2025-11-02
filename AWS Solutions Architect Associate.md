@@ -732,3 +732,160 @@ Used to synchronize data. Moves large amounts of data to and from:
 Can synchronize to S3, EFS, FSx. Replication tasks for DataSync are not continuous, but rather scheduled hourly, daily or weekly. File permissions and metadata are preserved. Others don't do this. 
 ## Storage Comparison
 ![[Storage Comparison.png]]
+# Decoupling Applications
+--- 
+## Simple Queueing Service (SQS)
+Producers send messages into the SQS queue. Consumers poll messages from the SQS. There can be multiple producers or consumers.
+
+### Standard Queue:
+- Used to decouple applications
+- Unlimited throughput, unlimited messages in the queue
+- Messages are shortlived, by default retention of messages 4 days, maximum 14 days. Messages have to be polled during that time otherwise it is lost
+- Low latency, < 10ms on publish and receive
+- Limitation of 1024 KB per message
+- Can have duplicate messages (at least once delivery)
+- Can have out of order messages (best effort ordering)
+
+Producers send messages using the SDK (SendMessage API). Message is persisted in SQS until a consumer deletes it, taking into account retention.
+Consumers (running on EC2 instances, servers, Lambda or else) polls the SQS for messages, can receive up to 10 messages at a time. Consumers then process the messages (for example insert the message into RDS). Messages are then deleted using the DeleteMessage API from the SDK, which guarantees that no other consumer will see this message.
+
+The advantage of using SQS is that if we want to scale horizontally, we can add consumers to improve throughput of message processing, perfect use case for using auto scaling groups. Can set up a CloudWatch metric monitoring the queue length which triggers a CloudWatch Alarm to increase the scaling of the ASG. Another use could be to decouple database writes. Sometimes, if the load to write is too large, some transactions may be lost. Instead we can have an enqueue ASG to send messages to an SQS, and then a dequeue ASG to receive messages that are then inserted into the database. Its should only be used for applications that do not require confirmation that the data has been inserted.
+
+`Encryption`:
+- In flight using HTTPS API
+- At rest using KMS keys
+- Client side encryption if the client wishes to manage it 
+`Access Controls`: 
+- IAM policies to regulate access
+`SQS Access Policies`:
+- Similar to S3 bucket policies
+- Useful for cross account access to SQS queues
+- Or for allowing other services to write to an SQS queue
+### FIFO Queue
+First in First out, so messages are sent and polled sequentially. Using this kind of queue there is a limited throughput, 300 messages per second without batching and 3000 with batching. Capability for "Exactly once send", duplicates are removed at the queue level using Deduplication ID (messages will have them attached), deduplication in a 5 minute window. Capability for ordering by Message Group ID.
+
+### Message Visibility Timeout
+After a message is polled, it becomes invisible to other consumers. By default the time out is 30s, during which the message has 30s to be processed. If a message is not processed within the timeout, it might be processed multiple times, i.e. after its visible again. A consumer could call the ChangeMessageVisibility API to get more time. If timeout too long and consumer crashes, reprocessing takes very long. If timeout too low, there may be duplicates.
+### Long Polling
+When a consumer requests messages from the queue, it can optionally wait for messages to arrive if there are none in the queue. Long Polling decreases the number of API calls made to SQS while increasing the efficiency and reducing latency of the application. Long polling can be set from 1 to 20 seconds. Overall it is preferable to short polling.
+## Simple Notification Service (SNS)
+Used to send one message to many receivers. Uses a publication/subscription model. The event producer only sends messages to one SNS topic, the event receivers listen to the SNS topic for notifications. Each subscriber to the topic will get all the messages. Up to 12,500,000 subscriptions per topic with 100,000 topics limit.
+
+To publish we have 2 methods:
+`Topic Publish`:
+- Uses the SDK
+- Create a topic
+- Create a subscription or many
+- Publish to the topic
+`Direct Publish`:
+- For mobile apps SDK
+- Create a platform application
+- Create a platform endpoint
+- Publish to the platform endpoint
+- Works with Google GCM, Apple APNS, Amazon ADM...
+
+SNS has the same security offerings as SQS.
+
+## SNS + SQS Fan Out 
+Say we need to push messages to many SQS queues. Instead we put once to an SNS, and receive from all the SQS queues that are subscribers. Fully decoupled model with no data loss. SQS allows for data persistence, delayed processing and retries of work. Allows to add more SQS subscribers over time. Works with SQS queues in other regions.
+
+Only 1 S3 event rule can be defined for each combination of event type and prefix. So if you want to send the same S3 event to many SQS queues, use fan out.
+
+Can also do a SNS FIFO + SQS FIFO fan out.
+
+SNS can also do message filtering via a JSON policy used to filter the messages sent to subscribers. If a subscription doesn't have a filter policy, it receives every message.
+## Kinesis Data Streams
+Used to collect and store streaming data in real-time. Data that is created and used on the spot. To send data to a Kinesis Data Stream, we need a producer, which can be a custom build application or a kinesis agent. Kinesis Data Stream will send the real time data to consumers, which could be an application, Lambda, Data Firehose, or Managed Service for Apache Flink. 
+
+Kinesis offers the following features:
+- Retention up to 365 days
+- Ability to replay data by consumers
+- Data can't be deleted from Kinesis, have to wait for it to expire
+- Data up to 1 MB, typical use case is lots of small real time data
+- Data ordering guarantee for data with the same Partition ID
+- At rest KMS encryption, in flight HTTPS encryption
+- Can use the Kinesis Producer Library (KPL) to write an optimized producer applications
+- Can use the Kinesis Client Library (KCL) to write an optimized consumer application
+
+Capacity modes:
+`Provisioned mode`:
+- Allows you to choose the number of shards
+- Each shard gets 1 MB/s in
+- Each shard gets 2 MB/s out
+- Scale manually to increase or decrease the number of shards
+- You pay for each provisioned shard per hour
+`On demand mode`:
+- No need to provision or manage capacity
+- Default capacity provisioned 4MB/s
+- Scales automatically based on observed throughput peak during the last 30 days
+- Pay per stream per hour and data in/out in GBs
+## Data Firehose
+![[Firehose.png]]Fully Managed service to send data to target sources. It has automatic scaling, is serverless and has pay for what you use. It is a Near Real Time service, with buffering capability based on size/time. Data is buffered and then sent in batches, hence Near Real Time. Supports CSV, JSON, Parquet, Avro, Raw Text, Binary data. Allows conversions to Parquet/ORC, compressions with gzip/snappy. Also allows custom transformations using Lambda.
+## Kinesis Data Stream vs Data Firehose
+`Kinesis`:
+- Streaming data collection
+- Producer and consumer code
+- Real time
+- Provisioned/on demand
+- Data storage up to 365 days
+- Replay capability
+`Firehose`:
+- Load streaming data into other services, AWS or 3rd party/custom
+- Fully managed and serverless
+- Near real time
+- Automatic scaling
+- No data storage
+- No replay capability
+## Amazon MQ
+SQS and SNS are cloud native services running on proprietary AWS protocols. However, traditional applications may be running from on premises using open protocols such as MQTT, AMQP, STOMP, Openwire, WSS. When migrating to the cloud, instead of re-engineering the application to use SQS and SNS, we can use Amazon MQ. 
+
+It is a managed message broker service for RabbitMQ and ActiveMQ. It doesn't scale as much as SQS and SNS though. Amazon MQ runs on servers and can run in Multi AZ with failover. It also has both a queue feature to mimic SQS and topic features to mimic SNS. 
+
+To setup failover, we need to mount the active and standby MQ brokers to an EFS. When the active fails, standby takes over.
+# Containers on AWS
+---
+## Elastic Container Service (ECS)
+Used to launch Docker containers on AWS. When launching a container, it essentially launches an ECS task on ECS clusters, ECS clusters can be of many types as we will see. AWS takes care of starting and stopping containers
+
+`EC2 Launch Type`: You must provision and maintain the EC2 instances. Each EC2 instance must run the ECS agent to register in the ECS cluster.
+`Fargate Launch Type`: Serverless, so no need to provision the infrastructure. You just create task definitions and AWS runs the ECS Tasks automatically. Uses Fargate.
+
+IAM roles should be used for ECS. Roles should be given to the ECS agent for the necessary API calls, and a role for each ECS task to allow each role to have access to different ECS services you may run, for example one -> S3, two -> DynamoDB. 
+
+ECS has integrations with load balancers. In general we can run an application load balancer for load balancing. Network load balancer can also be used for high throughput/performance use cases or to pair with an AWS Private Link. ECS clusters can also have mounted EFS.
+
+For ECS auto scaling we can use AWS Application Auto Scaling to automatically increase/decrease the desired number of ECS tasks. We can set it to scale on:
+- CPU utilization of ECS
+- Memory Utilization of ECS
+- ALB Request Count per Target - metric from ALB
+
+We can use Target Tracking, scale based on target value for a specific CloudWatch metric. Step Scaling, scale based on a specified CloudWatch Alarm and Scheduled scaling, scale based on a specified time/date. Keep in mind ECS autoscaling is at the task level, whereas EC2 auto scaling is at the instance level. 
+
+To scale when using EC2 launch type, we can scale the ASG, or we can use the newer option ECS Cluster Capacity Provider. 
+- Automatically provision and scale infrastructure for ECS Tasks
+- Capacity provider paired with an auto scaling group
+- Adds EC2 instances when you're missing capacity
+## Elastic Container Registry
+Store and manage Docker images on AWS. We can store images privately, or publicly on public galley. Fully integrated with ECS and backed by S3. On top of being a repo, it supports image vulnerability scanning, versioning, image tags, image lifecycle...
+## Elastic Kubernetes Service
+Managed service to launch Kubernetes Clusters on AWS. Kubernetes is an open source system for automatic deployment, scaling and management of containerized applications, usually docker. It is an alternative to ECS. Supports EC2 launch mode and Fargate. Use case for EKS if your company is already using Kubernetes and wants to migrate to AWS. EKS works by deploying nodes, which is a group of instances running on an AZ.
+
+`Managed Node Groups`:
+- Creates and manages nodes for you
+- Nodes are part of an ASG managed by EKS
+- Supports on demand and spot instances
+`Self Managed Nodes`:
+- Nodes created by you and registered to the EKS cluster and managed by an ASG
+- You can use prebuilt AMI - EKS Optimized AMI
+- Supports on demand and spot instances
+`Fargate`:
+- Managed and serverless
+
+`Data Volumes`
+Need to specify StorageClass manifest on your EKS cluster. Leverages a Container Storage Interface (CSI) compliant driver. Supports EBS, EFS, FSx for Lustre and FSx for NetApp ONTAP
+## App Runner
+Managed service to deploy web applications and APIs at scale. No infrastructure required. Start with your source code or container image, then configure basic settings for the web application such as the CPU, RAM, auto scaling, health checks. Then App Runner automatically builds and deploys the web app. Automatic scaling, highly available, load balancing, encryption, and application can have VPC access support. So it can connect to databases, cache and message queue services.
+## App2Container
+CLI tool for migrating and modernizing Java and .NET web apps into Docker Containers. Used for Lift and shift migrations, where apps are running in on premise machines. No need to change code, allows to migrate legacy apps. Generates CloudFormation for the compute/network. And app is registered as a Docker container to ECR. Then can be deployed to ECS, EKS or App Runner. Supports pre built CI/CD pipelines. 
+
+Very likely only basic knowledge is needed. Name says enough.
