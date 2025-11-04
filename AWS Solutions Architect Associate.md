@@ -889,3 +889,144 @@ Managed service to deploy web applications and APIs at scale. No infrastructure 
 CLI tool for migrating and modernizing Java and .NET web apps into Docker Containers. Used for Lift and shift migrations, where apps are running in on premise machines. No need to change code, allows to migrate legacy apps. Generates CloudFormation for the compute/network. And app is registered as a Docker container to ECR. Then can be deployed to ECS, EKS or App Runner. Supports pre built CI/CD pipelines. 
 
 Very likely only basic knowledge is needed. Name says enough.
+# Serverless Services
+---
+## AWS Lambda
+Managed service for serverless functions. Supports basically every language and for the ones that aren't there are custom runtimes available. Integrates with:
+- API Gateway to create and easily publish APIs
+- Kinesis, for data transformation
+- DynamoDB for creating triggers, when something happens lambda is triggered
+- S3 triggers
+- CloudFront, Lambda@Edge
+- And others
+
+`Limitations to Know - per region`
+Execution: 
+- Memory allocation, 128 MB - 10GB 
+- When memory is increased, we have more available vCPU
+- Max execution time 15minutes
+- Environment variables up to 4KB
+- Temporary space for bigger files, disk capacity in /tmp 512 MB to 10GB
+- Concurrent executions is 1000
+Deployment:
+- Lambda function for compressed .zip is 50MB
+- For uncompressed, deployment max size is 250 MB
+- Can use /tmp to load other files at startup
+- Size of environment variables: 4KB
+
+`Concurrency and Throttling`
+Concurrent limit of up to 1000 concurrent executions. We can set a reserved concurrency set at the function level which limits the number of concurrent executions. Each invocation over the concurrency limit will trigger a throttle, with 2 different behaviours.
+- Synchronous invocation -> return Throttle Error - 429
+- Asynchronous invocation -> retry automatically and then go to dead letter queue. Continues retrying up to 6 hours with an exponential backoff time, from 1s to a maximum of 5 minutes
+The concurrency limit is for your account, so it is important to reserve the limits otherwise if one of your applications gets overloaded, i.e. it scales up to 1000 concurrent executions, then if we have another application, that one will be throttled.
+
+Use provisioned concurrency to avoid cold starts (initialization can take time, so first request served by a new instance has higher latency). Concurrency is allocated before in advance before the function is invoked, which can also be managed by application auto scaling.
+
+`Lambda SnapStart`
+Improves your Lambda functions' performance up to 10x for free for Java, Python and .NET. SnapStart basically pre-initializes the functions, so no need to initialize the functions from scratch on every invocation. When you publish a new version of your function, Lambda initializes it, takes a snapshot of memory and disk state of the function, and snapshot is cached for low latency access.
+
+By default, Lambda is launched outside your own VPN in an AWS VPC. Therefore it cannot access resources in your VPC. To allow it to access your resources, you can launch it in your VPC. You must define the VPC ID, the subnets and security groups. Lambda will create an ENI in your subnets. A common use case is to launch in your VPC to pool Lambda RDS connections with RDS Proxy.x
+## Functions at the Edge
+Many applications execute some form of logic at the edge. We can use Edge Functions to attach to CloudFront distributions to do this. This way it runs close to the users to minimize latency. We can do this 2 ways.
+
+CloudFront Functions
+- Lightweight functions written in JavaScript
+- For high scale, latency sensitive CDN customizations
+- Sub ms startup times and supports millions of requests/second
+- Used to change viewer requests (after CloudFront receives a request from viewer) and responses (before CloudFront forwards response to viewer)
+- Mostly for very simple functions, for more complex ones use Lambda@Edge
+Lambda@Edge
+- Written in NodeJS or Python
+- Scales to 1000s of requests/second
+- Used to change viewer requests and responses
+- But also to change Origin requests (before CloudFront forwards request to origin) and Origin responses (after CloudFront receives the response from origin)
+- Author the functions in one AWS region and then CloudFront replicates to its locations
+- Overall Lambda@Edge is better for longer functions that require more memory and/or package size.
+## DynamoDB
+Fully managed, highly available with replication across multi AZ, NoSQL DB. Scales to massive workloads, millions of requests per second, trillions of rows, 100s of TB of storage. Single-digit latency, integrated with IAM for security, authorization and administration. It is low cost and has auto scaling capabilities. It is always available and there is no maintenance or patching required.
+
+DynamoDB is made of Tables
+- Each table has a primary key
+- Each table can have an infinite number of items (rows)
+- Each item has attributes (columns) which can be added over time and can be null
+- Maximum size of an item is 400KB
+- Supports Scalar Types (string, number, binary, boolean, null), Document Types (List, Map) and Set Types (String Set, Number Set, Binary Set)
+- DynamoDB can rapidly evolve schemas
+There are Standard tables and IA tables. There are also global tables that are 2 way replicated across regions. To use this, must enable DynamoDB Streams.
+
+Read/Write Capacity modes
+`Provisioned Mode (default)`:
+- Specify number of reads/writes per second
+- Plan capacity beforehand
+- Pay for provisioned Read Capacity Units (RCU) and WCU
+- Can add auto scaling mode for RCU and WCU
+`On Demand Mode`:
+- Automatic scaling of read/writes based on workload
+- No capacity planning needed
+- Pay for what you use, much more expensive though
+- Great for unpredictable workloads and steep spikes
+## DynamoDB Advanced Features
+### DynamoDB Accelerator (DAX)
+Managed, highly available, seamless in memory cache for DynamoDB. Fully compatible with existing DynamoDB APIs. By default has 5 minute TTL. DAX is useful for caching individual objects, while ElastiCache should be used to store larger queries, for example you calculated a long computation and you store the result on ElastiCache.
+### Stream Processing
+Used to stream real time data, create/update/delete. Similar to Kinesis Data Stream
+### Disaster Recovery
+DynamoDB supports continuous backups using point in time recovery PITR, optionally enabled for the last 35 days. Can recover to any time within the backup recovery. The recovery process creates a new table.
+
+There are also on demand backups, i.e. full backups for long term retention until explicitly deleted. No effect on performance or latency. Can be configured and managed in AWS Backup.
+### Integration with S3
+Can export directly to S3 but needs PITR enabled. Works for any point of time in the last 35 days. Can be used to perform data analysis on top of DynamoDB by exporting the data. Can retain snapshots for auditing. Can do ETL on S3 data before importing back to dynamo. Supports JSON or ION format.
+
+Similarly can import from S3, supports CSV, DynamoDB JSON or ION. Doesn't consume any write capacity and creates a new table. Import errors are logged in CloudWatch Logs.
+## API Gateways
+Serverless service to create REST APIs. 
+![[API Gateway example.png]]
+Supports WebSocket Protocol. Handles API versioning and also handles different environments (dev, test, prod). Handles security, authentication and authorization. Creates API keys and handles request throttling. Can use standards such as Swagger/Open API to quickly define APIs. Transforms and validates requests and responses. Generate SDK and API specifications. Cache API responses.
+
+Integrations
+`Lambda`:
+- Easy way to expose Rest API backed by Lambda
+`HTTP`:
+- Expose HTTP endpoints in the backend.
+- Useful to add rate limiting, caching and other features
+`AWS Service`:
+- Any AWS API through the gateway.
+- For example a kinesis data stream
+
+Endpoint Types
+`Edge Optimized (default)`:
+- Requests are routed through CloudFront Edge locations
+- API Gateway still lives in only 1 region
+`Regional`:
+- For clients within the same region
+- Could manually combine with CloudFront, this way allows for more control over caching strategy and distribution
+`Private`:
+- Only accessible from your VPC using an interface VPC endpoint (ENI)
+- Use a resource policy to define access
+
+Security
+`User Authentication Through`:
+- IAM roles - internal applications
+- Cognito - external users
+- Custom Authorizer
+`Custom Domain Name HTTPS via AWS Certificate Manager`:
+- If using Edge Optimized endpoint, then the certificate must be in us-east-1
+- If using regional endpoint, the certificate must be in the API Gateway region
+## AWS Step Functions
+Used to build serverless visual workflows to orchestrate your Lambda Functions. Features: sequencing, parallel, conditions, timeouts, error handling... Can integrate with EC2, ECS, on premise servers, API Gateway, SQS queue, etc... Possibility of implementing human approval feature.
+## Amazon Cognito
+Give users an identity to interact with our Web or mobile application. 
+`Cognito User Pools`:
+- Create a serverless database of users for your web and mobile apps
+- Simple login, username or email/password combination
+- Password resets
+- Email and Phone number verification
+- MFA
+- Integrates with Identity Pools
+`Cognito Identity Pools`:
+- Provide AWS credentials to outside users so they can access AWS resources directly
+- Users source can be Cognito User Pools, 3rd party logins, etc...
+- Users can then access AWS directly or through an API Gateway
+- IAM policies are applied to the credentials and are defined in Cognito
+- They can be customized based on the user_id for more control
+- There are default IAM roles for authenticated and guest users
