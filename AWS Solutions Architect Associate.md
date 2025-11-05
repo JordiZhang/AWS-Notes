@@ -281,6 +281,143 @@ Redis Use Case
 - MSSQL Server: 1433
 - MariaDB: 3306 (same as MySQL)
 - Aurora: 5432 (if PostgreSQL compatible) or 3306 (if MySQL compatible)
+# Databases - Extended
+---
+- Relational Database Management Systems (SQL): RDS, Aurora
+- NoSQL DB: DynamoDB (JSON), ElastiCache (key/value pairs), Neptune (Graph), DocumentDB (MongoDB), Keyspaces (Apache Cassandra)
+- Object Store: S3/Glacier
+- Data Warehouse (SQL analytics and BI): Redshift, Athena, EMR
+- Search: OpenSearch
+- Graphs: Neptune
+- Ledge: Amazon Quantum Ledge Database
+- Time series: Timestream
+## DocumentDB
+AWS optimized implementation of MongoDB, NoSQL DB.
+- Used to store, query and index JSON data
+- Fully managed and highly available with replication across 3 AZ
+- DocumentDB storage automatically grows in increments of 10GB
+- Automatically scales workloads with millions of requests per second
+## Neptune
+- Managed graph database
+- A graph database could be a social network that is very interconnected as a graph
+- Highly available across 3 AZ, up to 15 read replicas
+- Build and run applications working with highly connected datasets
+- Can store up to billions of relations and query the graph with millisecond latency
+
+Neptune Streams
+- Real time ordered sequence of every change to your graph data
+- Changes are available immediately after writing
+- No duplicates, strict order
+- Stream data is accessible using an HTTP REST API from Neptune Streams
+- Use cases for enabling Neptune streams:
+	- Send notifications when certain changes are made
+	- Maintain graph data synchronized with another data store
+## Keyspaces (for Apache Cassandra)
+Managed service for deploying Apache Cassandra compatible databases
+- Serverless, Scalable, highly available
+- Automatically scales tables up/down based on applications traffic
+- Tables are replicated 3 times across multiple AZ
+- Uses Cassandra Query Language (CQL)
+- Single digit millisecond latency at any scale, 1000s of requests per second
+- Capacity: On demand or provisioned with auto scaling
+- Encryption, backups, PITS up to 35 days
+## Timestream
+Managed service for fast, scalable, time series database. 
+- Automatically scales up/down to adjust capacity
+- Store and analyze trillions of events per day
+- 1000s of times faster and 1/10th the cost of relational databases
+- Scheduled queries, multi-measure records, SQL compatibility
+- Data storage tiering: recent data kept in memory and historical data kept in a cost optimized storage
+- Built in time series analytics functions
+- Encryption in transit and at rest
+# Data and Analytics
+---
+## Athena
+Serverless query service to analyze data stored in S3
+- Uses SQL to query files, built on Presto
+- Supports CSV, JSON, ORC, Avro and Parquet
+- Pricing $5 per TB of data scanned
+- Commonly used with Quicksight for dashboards
+
+Performance Improvements
+- Use columnar data for cost savings (less scans), therefore Parquet or ORC is recommended
+- Huge performance improvement
+- Use Glue to convert data to Parquet or ORC 
+- Compress data for smaller retrievals
+- Partition datasets in S3 for easy querying on virtual columns
+- Use larger files to minimize overhead
+
+Federated Query
+- Allows you to run SQL queries across data stored anywhere
+- Uses Data Source Connectors that run on AWS Lambda to run Federated queries on anything
+## Redshift
+PostgreSQL based database used for OLAP (Online Analytical Processing).
+- 10x better performance than other data warehouses and scales to PBs of data
+- Columnar storage of data and parallel query engine
+- Two modes: Provisioned cluster or Serverless cluster
+- Has a SQL interface for queries
+- Integrates with Quicksight and Tableau
+
+Within a Redshift cluster, there are leader nodes (for query planning and results aggregation) and compute nodes (for performing queries and sending results to leader). In provisioned mode:
+- You choose instance types in advance
+- Can reserve instances for cost savings
+
+### Snapshots and Disaster Recovery
+Redshift is mostly single AZ, but has Multi AZ mode for some clusters. Snapshots are PITR backups of a cluster that are stored internally in S3. Snapshots are increments, only saves changes. You can restore snapshots into a new cluster. Snapshots are automated for every 8 hours, every 5GB or on a set Schedule. Also allows user to set the retention time. Manual snapshots can also be done, and these are retained until you explicitly delete them. You can also configure Redshift to automatically copy snapshots of a cluster to another AWS Region for replication and disaster recovery.
+### Loading Data into Redshift
+Large inserts are much better in general. We can use the following:
+- Data Firehose
+- S3 using COPY command
+- EC2 instance using JDBC driver
+
+### Redshift Spectrum
+This feature allows you to query data that is in S3 without loading it
+- Must have Redshift cluster available to start the query
+- The query is then submitted to thousands of Redshift Spectrum nodes
+## Amazon OpenSearch Service
+Used to be called ElastiSearch. In DynamoDB, queries only exist by primary key or indexes. With OpenSearch, you can search any field, even partial matches. Its common to use OpenSearch as a complement to another database. It has a managed cluster or serverless cluster. OpenSearch has its own query language so it doesn't natively support SQL but can be enabled via a plugin. Security through Cognito and IAM, KMS encryption, TLS. Comes with OpenSearch Dashboards for visualization. Essentially used to search for items in different services/storages.
+## Amazon ElasticMapReduce (EMR)
+EMR helps to create Hadoop clusters to analyze and process vast amounts of data. Clusters can be made of hundreds of EC2 instances. EMR comes bundled with Spark, HBase, Presto, Flink... EMR takes care of all the provisioning and configuration. Has autoscaling capabilities and is integrated with Spot instances.
+
+EMR clusters are made of hundreds of EC2 instances. We have: 
+- Master nodes: manage and coordinates the cluster and health - long running
+- Core nodes: Run tasks and store data - long running
+- Task Nodes (optional): Just to run tasks - Usually spot instances
+Purchasing options:
+- On demand: reliable, predictable, won't be terminated
+- Reserved: cost savings, EMR will automatically use if available
+- Spot Instances: cheaper, can be terminated, less reliable
+Finally, you can have long running clusters or transient/temporary clusters.
+## Amazon Quicksight
+Serverless machine learning powered BI tool to create dashboards. Integrates with RDS, Aurora, Athena, Redshift, S3... Has feature to do in-memory computation using the SPICE engine, only available if data is imported into Quicksight. For Enterprise edition, there is possibility to setup Column-Level Security (CLS).
+
+In Quicksight, you define Users (Standard version) and Groups (enterprise version). These users and groups are Quicksight only, not IAM. A dashboard is a read-only snapshot of an analysis that you can share that preserves the configuration of the analysis such as filters and others. You can share the analysis or the dashboard with Users or Groups. Users who see the dashboard can also see the underlying data.
+## AWS Glue
+Managed ETL service. Glue data catalog is a feature that allows for Glue Data Crawlers to crawl different databases and writes the metadata into a Glue Data Catalog. Glue can then use the catalog to do ETL. Athena, Redshift Spectrum and EMR Leverages Glue Data catalog to perform data discovery.
+
+Features to know:
+- Glue Job Bookmarks: prevents re processing old data
+- Glue DataBrew: Clean and normalize data using prebuild transformations
+- Glue Studio: New GUI to create, run and monitor ETL jobs in Glue
+- Glue Streaming ETL (built on Spark Structured Streaming): Instead of batch jobs, it runs the ETL as Streams. Compatible with Kinesis Data Streaming and MSK (managed Kafka)
+## AWS Lake Formation
+A data lake is a central place to have all your data for analytics purposes. Lake formation is a fully managed service to easily setup a data lake in days, normally might take months, in S3. Useful to discover, cleanse, transform and ingest data into your data lake. Automates many complex manual steps and deduplicates using Machine Learning Transforms. Combines structured and unstructured data in the data lake. It also has blueprints that help you migrate data from S3, RDS and other. Allows for fine grain access control for your applications at the row and column level. Built on AWS Glue. A key use of lake formation is centralized permissions, instead of allowing permissions to tons of sources, Athena and Quicksight and others, we can instead just give permissions to Lake Formation
+## Amazon Managed Service for Apache Flink
+Flink is a framework for processing data streams in Java, Scale or SQL. Run any Apache Flink application on an AWS managed cluster. It can read from Kinesis Data Streams or Amazon MSK (Kafka). Doesn't read from Data Firehose.
+## Amazon Managed Streaming for Apache Kafka
+It is an alternative to Amazon Kinesis used to stream data. This service gives us a fully managed Apache Kafka cluster on AWS. Allows you to create, update, delete clusters. Deploys the MSK cluster in your VPC and has multi AZ up to 3 for high availability. Automatic recovery from common Kafka failures. Data is stored on EBS volumes for as long as you want.
+
+There is also a Serverless mode where we don't have to manage capacity and MSK automatically provisions resources and scales.
+![[Data Stream vs MSK.png]]
+## Big Data Ingestion Pipeline
+- We want a fully serverless ingestion pipeline
+- We want to collect data in real time
+- Transform data
+- Query data using SQL
+- Create reports using the queries and store in S3
+- Load data into warehouse and create dashboards
+![[Big Data Pipeline.png]]
+
 # Route 53
 ---
 ## What is a DNS??
@@ -1071,3 +1208,162 @@ Some of these challenges are solved by Serverless Patterns:
 - When a new software update is out, we get a lot of requests and the content is distributed in mass over the network, its very costly
 - We don't want to change our application, but want to optimize our cost and CPU usage
 - Just use CloudFront to cache the software update files at the edge since software updates are static files
+# Machine Learning
+--- 
+`AWS Rekognition`:
+- Finds objects, people, text, scenes in images and videos using ML
+- Has option for content moderation, set a minimum confidence threshold for items that will be flagged
+- Flag sensitive content for manual review in Amazon Augmented AI (A2I)
+`AWS Transcribe`:
+- Automatically convert speech into text
+- Uses a deep learning process called automatic speech recognition (ASR)
+- Automatically remove Personally Identifiable Information (PII) using Redaction
+- Supports automatic language identification for multi-lingual audio
+`AWS Polly`:
+- Turns text into lifelike speech using deep learning
+- Can use Lexicon and SSML
+- Customize pronunciation of words with pronunciation lexicons (sort of rules for special cases)
+- Generate speech from documents marked up with Speech Synthesis Markup Language (SSML) which enables more customization such as emphasizing certain words, phonetic pronunciation, whispering, newscaster speaking style etc... 
+`AWS Translate`:
+- Translates languages
+`AWS Lex`:
+- Powers Alexa
+- Build Chatbots
+- Automatic speech recognition (ASR) to convert speech to text
+- Natural language understanding to recognize intent 
+`AWS Connect`:
+- Receive calls, create contact flows, cloud based virtual contact center
+- Can integrate with other customer relation management (CRM) systems or AWS
+- So someone calls the company number, which gets sent to AWS Connect, it streams the call to Lex which recognizes what the user wants, and invokes some Lambda function for redirection or maybe sending a command to a CRM
+`AWS Comprehend`:
+- Natural Language Processing (NLP)
+- Serverless and fully managed
+- Uses machine learning to find insights, information or relationships in text
+	- For example analyzing customer emails to find what leads to positive or negative experiences
+- Comprehend Medical detects and returns useful information in unstructured clinical text:
+	- Physician notes
+	- Discharge summaries
+	- Test results
+	- Case notes
+- Uses NLP to detect protected health information
+`AWS SageMaker`:
+- Fully managed service for developers/data scientists to build ML models
+- Basically what I need to know for the exam is the process of building and training a model and making predictions using it. My SHP
+`AWS Kendra`:
+- Managed document search service 
+- Extract answers from within a document
+- Kendra builds a knowledge index, so makes it easy to search for information in the documents
+- Natural language search capabilities
+- Incremental Learning
+`AWS Personalize`:
+- ML service to build apps with real time personalized recommendations
+`AWS Textract`:
+- Automatically extracts text, handwriting and data from any scanned documents
+- For example, scan an id, extracts all the info
+# CloudWatch (Monitoring)
+---
+CloudWatch provides metrics for every service in AWS. 
+Metrics also have "metadata" called dimensions, which are attributes of a metric, could be instance id, environment etc... Each metric can have up to 30 dimensions and each metric has a timestamp. You can also set up custom metrics. CloudWatch metrics can be streamed to a destination of your choice. 
+## CloudWatch Logs
+Stores application logs in AWS. To do so, we must first define Log Groups with an arbitrary name, usually representing an application. Then within each group we have multiple log streams which are sequences of log events that come from the same source. We can then define the log expiration policy. We can send CloudWatch Logs to
+- S3
+- Kinesis Data Streams
+- Firehose
+- Lambda
+- OpenSearch
+Logs are encrypted by default and can be setup to use KMS encryption with your own keys.
+
+Sources:
+- SDK, CloudWatch Logs Agent, CloudWatch Unified Agent
+- Elastic Beanstalk: application logs
+- ECS: collection from containers
+- Lambda: Function logs
+- VPC Flow Logs
+- API Gateway
+- CloudTrail based on filter
+- Route53: DNS queries
+
+CloudWatch Logs Insights allows you to perform queries on your logs and visualize them. Helps you search and analyze log data stored on CloudWatch Logs. Uses a purpose built query language that automatically discovers fields from AWS services and JSON log events. Can also query multiple Log groups in different AWS accounts. Importantly, it is a query engine, not a real time engine.
+
+CloudWatch can be exported into many destinations. The first of which is S3 export. Log data can take up to 12 hours to become available for export, and as such is not real time. If we want real time or near real time, we use Logs Subscriptions instead. This allows you to get a real time stream of log events from CloudWatch Logs. Can send to Kinesis Data Streams, Data Firehose or Lambda. Can filter which logs are delivered to destination.
+
+By default, no logs from EC2 instances will go to CloudWatch. To get those logs, we need to run a CloudWatch agent on EC2 to push the log files. The EC2 instances must have proper IAM roles to push to CloudWatch. Similarly CloudWatch agent can also be used for on premises servers. There are 2 types of agents:
+`CloudWatch Logs Agent`:
+- Old version
+- Can only send to CloudWatch Logs
+`CloudWatch Unified Agent`:
+- Collects additional system level metrics such as RAM, processes etc... and at a much finer detail compared to Logs Agent.
+- Collects logs to send to CloudWatch Logs
+- Centralized configurations using SSM Parameter Store
+## CloudWatch Alarms
+Alarms are used to trigger notifications for any metric. There are various options such as sampling, %, max, min, etc... There are 3 alarm states:
+- OK
+- INSUFFICIENT_DATA
+- ALARM
+You set up the period of the alarm, the length of time to evaluate the metric. There are 3 main targets for alarms: 
+- Stop, Terminate, Reboot or Recover an EC2 instance
+- Trigger Auto Scaling Action
+- Send Notifications to SNS (from which you can do anything you want such as trigger a Lambda function)
+Alarms can be manually triggered for testing purposes via the CLI.
+## Composite Alarms
+CloudWatch alarms are on a single Metric. Composite Alarms instead monitor the states of multiple other Alarms. It uses AND and OR conditions. Helpful to reduce alarm noise by creating complex composite alarms. 
+## CloudWatch Insights
+### Container Insights
+Collect, Aggregate, summarize metrics and logs from containers. Available for containers on ECS, EKS, Kubernetes platforms on EC2 and Fargate. In EKS and Kubernetes on EC2, it uses a containerized version of the CloudWatch agent to discover containers.
+### Lambda Insights
+Monitoring and troubleshooting solution for serverless applications running on Lambda. Collects, aggregates and summarizes system level metrics (CPU, memory, network...) and diagnostic information (cold starts, worker shutdowns...). Lambda Insights is provided as a Lambda Layer.
+### Contributor Insights
+Analyze log data and create time series that display contributor data. This helps you find top talkers and understand who or what is impacting system performance. Works for any AWS generated logs. For example finding bad hosts, heaviest network users or most error prone URLs. It also provides built in rules that you can use to analyze metrics from other AWS services.
+### Application Insights
+Provides automated dashboards that show potential issues with monitored applications to help isolate ongoing issues. Powered by SageMaker. Gives you enhanced visibility into your application health to reduce the time it will take you to troubleshoot and repair your applications. Findings and alerts are sent to EventBridge and SSM OpsCenter.
+# CloudTrail (Auditing Actions)
+---
+Provides governance, compliance and audit for your AWS account. It is enabled by default. It allows you to get a history of events and API calls made within your AWS account by:
+- Console
+- SDK
+- CLI
+- AWS Services
+You can put the logs from CloudTrail into CloudWatch Logs or S3. A trail can be applied to All regions (default) or to a single Region. Who did what and when.
+## CloudTrail Events
+`Management Events`:
+- Operations that are performed on resources in your AWS account, configuring security, rules for routing data, setting up logging etc...
+- By default trails are configured to log management events
+- Can separate Read Events (don't modify) from Write Events (may modify resources)
+`Data Events`:
+- By default, data events are not logged because they have a high volume of operations
+- Amazon S3 object level activity, can separate Read and Write Events
+- AWS Lambda function execution activity
+`CloudTrail Insights`:
+- You have to enable it and pay for it
+- Detects unusual activity in your account
+- CloudTrail Insights analyzes normal management events to create a baseline and then continuously analyzes write events to detect unusual patterns 
+
+Events are stored by default for 90 days. To keep events beyond this period, log them into S3, then analysis can be done using Athena.
+# AWS Config (Compliance of Configurations)
+Service that allows you to do auditing and recording compliance of your AWS resources. In particular, records configurations and changes over time. You set up config rules that are then check for compliance. For example:
+- Is there unrestricted SSH access to my security groups?
+- Do my buckets have any public access?
+- Has my ALB configuration changed over time?
+You can receive alerts via SNS notifications for any changes. Config is a per region service but can be aggregated across regions and accounts. You can store the configuration data into S3 and later analyzed by Athena.
+
+`Config Rules`:
+- Can use AWS managed config rules
+- Can make custom config rules defined in Lambda
+- Rules can be evaluated/triggered for each configuration change and/or at regular time intervals
+- AWS Config Rules does not prevent actions from happening, only for compliance, it gives you a overview of your configuration 
+
+There is no free tier, you pay per configuration item recorded per region and per config rule evaluation per region.
+
+Although you cannot prevent actions from happening, you can automate remediation of non compliant resources using SSM Automation Documents. So you can trigger remediation actions when a resource becomes non compliant. For example when an IAM Access Key is expired, AWS Config can trigger a remediation action to deactivate the Key. These can be AWS managed automation documents or you can create custom automation documents that invoke a Lambda function. You can set Remediation retries in the event the resource is still non compliant after remediation.
+
+We can use EventBridge to trigger notifications when AWS resources are non compliant. It also has the ability to send configuration changes and compliance state notifications to SNS, which can then notify an admin for example.
+# EventBridge
+---
+Central console to manage events. Can schedule CRON jobs, Event rules to react to a service doing something, Trigger Lambda functions, send SQS/SNS messages etc... 
+
+Events are sent to EventBridge, from which it then generates a JSON file with the information of the event, and then can be sent to many many destinations, practically anything you want.
+
+AWS Services utilize the default Event bus. AWS has integrated with other outside partners. This means these AWS partners can also send their events into a specified Partner Event Bus in EventBridge. We can also send events from our own custom apps into EventBridge via a Custom Event Bus. Each Event bus can have Resource Based Policies to manage permissions. EventBridge also allows archiving events send to an event bus, these events can then be replayed (For example for debugging). 
+
+EventBridge has a Schema Registry. EventBridge can analyze the events in your bus and infer the schema of the data. The Registry allows you to generate code for your application that will know in advance how data is structured in the event bus, these schemas can also be versioned
+
