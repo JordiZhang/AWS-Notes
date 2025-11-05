@@ -1030,3 +1030,44 @@ Give users an identity to interact with our Web or mobile application.
 - IAM policies are applied to the credentials and are defined in Cognito
 - They can be customized based on the user_id for more control
 - There are default IAM roles for authenticated and guest users
+# Serverless Architectures
+--- 
+## Mobile App: To do List
+- Expose REST API with HTTPS
+- Users can directly interact with their own folder in S3
+- Users should authenticate through a managed serverless service
+- Users can write and read to dos, but they mostly read them
+- Database should scale and have high read throughput
+![[Todolist.png]]
+## Hosted Website: Blog
+- Website should scale globally
+- Blogs are rarely written, but often read
+- Most of the website is purely static files, some of it may be dynamic REST API
+- Caching must be implemented where possible
+- Any new users that subscribes should receive a welcome email
+- Any photo uploaded to the blog should have a thumbnail generated
+![[Blog.png]]For the email, we can use DynamoDB streams to stream any new users, have it invoke a lambda function to then send an email via SES (Simple Email Service).
+## Micro Services Architecture
+Not exactly serverless. 
+- Many services interact with each other directly using a REST API
+- Each architecture for each microservices may vary in form and shape
+- We want a microservice architecture so we can have a leaner development lifecycle for each service
+![[Microservices.png]]
+- Each microservice can be designed as you want
+- Synchronous patterns: API Gateway, Load Balancer
+- Asynchronous patterns: SQS, Kinesis, SNS, Lambda S3 Triggers
+
+Challenges with microservices:
+- Repeated overhead for creating each microservice
+- Issues with optimizing server density/utilization
+- Complexity of running multiple versions of multiple microservices simultaneously
+- Proliferation of client side code requirements to integrate with many separate microservices
+Some of these challenges are solved by Serverless Patterns:
+- API Gateway, Lambda scale automatically and you pay per usage
+- Can easily clone API, reproduce environments
+- Generated client SDK through Swagger integration for the API Gateway
+## Software Updates Offloading
+- We have an EC2 application that distributes software updates once in a while
+- When a new software update is out, we get a lot of requests and the content is distributed in mass over the network, its very costly
+- We don't want to change our application, but want to optimize our cost and CPU usage
+- Just use CloudFront to cache the software update files at the edge since software updates are static files
