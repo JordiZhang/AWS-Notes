@@ -1365,5 +1365,90 @@ Events are sent to EventBridge, from which it then generates a JSON file with th
 
 AWS Services utilize the default Event bus. AWS has integrated with other outside partners. This means these AWS partners can also send their events into a specified Partner Event Bus in EventBridge. We can also send events from our own custom apps into EventBridge via a Custom Event Bus. Each Event bus can have Resource Based Policies to manage permissions. EventBridge also allows archiving events send to an event bus, these events can then be replayed (For example for debugging). 
 
-EventBridge has a Schema Registry. EventBridge can analyze the events in your bus and infer the schema of the data. The Registry allows you to generate code for your application that will know in advance how data is structured in the event bus, these schemas can also be versioned
+EventBridge has a Schema Registry. EventBridge can analyze the events in your bus and infer the schema of the data. The Registry allows you to generate code for your application that will know in advance how data is structured in the event bus, these schemas can also be versioned.
+# IAM (Not necessarily the service)
+---
+## AWS Organizations
+Global service to manage multiple AWS accounts. Main account is the management account and the other accounts are member accounts. Member accounts can only be part of one organization. Features consolidated billing across all accounts, single payment. There are pricing benefits from aggregated usage of resources such as volume discounts for EC2. Reserved instances and savings plans discounts are shared across all accounts in the organization. There is also an API to automate account creation.
+![[Organizations.png]]
 
+Advantages
+- Multi account is better for security vs having one account with multiple VPC
+- Tagging standards for billing purposes
+- CloudTrail can be enabled on all accounts at once and send logs to a central S3 account.
+- CloudWatch Logs to central logging account
+- Establish cross account roles for admin purposes
+- We can define Service Control Policies (SCP), They are IAM policies applied to an OU or Accounts, however they do not apply to the management account. Must have explicit allows from the root through each OU, i.e. nothing is allowed by default.
+![[SCP Hierarchy.png]]
+
+AWS Organization also has Tag Policies. These help you standardize tags across resources in an organization. They ensure consistent tags, allow you to audit tagged resources and maintain proper resource categorization. You define tag keys and their allowed values. Helps with Cost allocation tags and attribute based access control. Prevents any non compliant tagging operations on the specified services and resources. Has no effect on resources without tags. You can also generate a report that lists all tagged/non compliant resources. Use EventBridge to monitor non compliant tags.
+## IAM
+`Conditions To Know for Resource Based Policies`:
+- aws:SourceIp: restrict client IP from which API calls are being made
+- aws:RequestedRegion: restrict region the API calls are made to
+- ec2:ResourceTag: restrict EC2 instances based on tags
+- aws:MultiFactorAuthPresent: to force MFA
+- aws:PrincipalOrgID: restrict access to accounts that are members of an organization
+
+`IAM Roles vs Resource Based Policies`:
+Cross Account:
+- Attach a resource based policy to a resource
+- Or use an IAM role as a proxy
+When you assume a role, you give up your original permissions and take the permissions assigned to the role. If you use a resource based policy, you don't give up your original permissions. 
+
+When a EventBridge rule needs to be run, it needs permissions on the target. For services supports resource based policies, Event Bridge will create a resource based policy to get permission. Other services will use a role, however some services that do support resource based policies, will still use IAM roles.
+
+`IAM Permission Boundaries`:
+- Supports users and roles, but not groups
+- Advanced feature to use a managed policy to set the maximum permissions an IAM entity can possibly get
+- If the given permissions are outside of the boundary, only permissions that overlap inside of the boundary are given, for example permission = admin access, boundary = S3 access, so overall only S3 access is given
+
+IAM Policy Evaluation Logic Flow Chart, Large chart so better to search it up.
+## IAM Identity Center
+Gives you a single sign on for all your AWS accounts in AWS organizations, any Business Cloud applications (salesforce, Box, Microsoft 365), SAML2.0 enabled applications and EC2 Windows Instances. Identity providers can be built in identity store in IAM identity center or a 3rd party identity center. In particular, Identity Center is for User level access management, while Organizations is about managing accounts. 
+
+Multi Account Permissions:
+- Manage access across AWS accounts in organization
+- Permission Sets, collection of one or more IAM policies assigned to users and groups to define AWS Access
+
+Application Assignments:
+- SSO access to many SAML 2.0 business applications
+
+Attribute Based Access Control (ABAC):
+- Fine grain permissions based on user attributes stored in IAM Identity Center Identity Store
+- Use case: Define IAM permissions once, then modify AWS access by changing attributes
+## AWS Directory Services
+Microsoft Active Directory (AD) is found on any Windows Server with AD Domain Services. It is a database of objects: User accounts, computers, printers, file shares, security groups etc... It provides centralized security management, account creation and permission assignment. Objects are organized in trees and a group of trees is a forest. 
+
+Directory Services provides a way to create Active Directory in AWS.
+`AWS Managed Microsoft AD`:
+- Creates your own AD in AWS, manage users locally, supports MFA
+- Establish trust connections with your on premise AD
+- Essentially have 2 AD in hybrid cloud configuration, if one of the authorizations fail try the other
+`AD Connector`:
+- Directory Gateway (proxy) to redirect to on premise AD, supports MFA
+- Users are managed on the on premise AD
+- AD connector Proxies authorization requests to on premise AD
+`Simple AD`:
+- Standalone AD for AWS
+- Cannot be joined with on premise AD
+
+IAM Identity Center Integration
+`AWS Managed Microsoft AD`:
+- Completely integrated, so IAM Identity Center just connects to it
+`Self Managed Directory`:
+- Create a two way trust relationship using AWS Managed Microsoft AD as intermediary between Identity Center and your own AD (on premise or otherwise)
+- Or create an AD Connector to proxy our managed AD and Identity Center
+## AWS ControlTower
+Easy way to automatically set up and govern a secure and compliant multi account AWS environment based on best practices. Uses AWS Organizations to create accounts. 
+
+Benefits:
+- Automate set up of environment 
+- Automate ongoing policy management using guardrails
+- Detect policy violations and remediate them
+- Monitor compliance through an interactive dashboard
+
+Guardrails
+- Provides ongoing governance for your ControlTower environment
+- Preventive Guardrail, using SCPs
+- Detective Guardrail, detects non compliance using AWS Config
