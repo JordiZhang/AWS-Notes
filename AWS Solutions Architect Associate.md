@@ -504,62 +504,6 @@ Health checks can be implemented for some routing types, they are only for publi
 	- Health checks can't access private endpoints private VPC or on premise resource, so we can create a CloudWatch Metric and associate an alarm. Then create a health check that checks the alarm
 ## Hybrid DNS
 Essentially having multiple DNS resolvers talking to each other. Inbound endpoints forwards DNS queries from other DNS resolvers to the Route 53 resolver. Outbound endpoints forwards DNS queries from the Route 53 resolver to your other resolvers. Check Lecture 120 for more detail. 
-# Solution Architectures
----
-## WhatsTheTime.com
-Stateless Web App
-- We don't need a database
-![[Stateless Webapp.png]]
-## MyClothes.com
-Stateful Web App
-- Allows people to buy clothes online
-- There is a shopping cart
-- Has hundreds of users at the same time
-- We need scaling and keep the web app as stateless as possible
-- Users should not lose their shopping cart
-- Users should have their details stored in a database
-
-How can we keep the shopping cart?
-- We could enable ELB Stickiness so that the shopping cart is stored on the EC2 Instance and thus the user always accesses the same instance
-- We could send shopping cart content as a User Cookie, this way it doesn't matter which EC2 instance is being used the shopping cart is still saved as the cookie. This is a stateless solution but the HTTP requests are heavier, also cookies could be altered, so the EC2 instances should validate the cookies. Cookies can only be 4 KB large.
-- Introduce a Server Session. The cookie only contains the session id. We can store the shopping cart session on ElastiCache, so the EC2 instances receive the web cookie with the session id and store/retrieve the session data (Shopping cart) from the ElastiCache
-![[Stateful Server Session.png]]
-
-Storing User Data
-- We can scale reads by setting up and RDS master and then having read replicas with replication
-- Alternatively we can scale reads by using lazy loading with ElastiCache. I.e. always try reading from the cache, if hit then good, if miss, read from the RDS DB and Store in cache for next time.
-![[Stateful Store User Data.png]]
-![[Stateful Webapp Security Groups.png]]
-## MyWordPress.com
-We are creating a fully scalable WordPress website. We want the website to access and correctly display images. 
-
-We could choose to use aurora for better scaling and performance.
-We can store images in EBS volumes for each instance. Works well for a single EC2 instance, but doesn't work for multiple. Instead we can use an EFS instead. This way we have ENI's in each AZ so the storage is shared between all the instances we have.
-![[Wordpress example.png]]
-## Instantiating Applications Quickly
-EC2 Instances:
-- Use a golden AMI: Install your applications, OS dependencies etc... beforehand and launch your EC2 instances from the Golden AMI
-- Bootstrap using User Data: For dynamic configuration, use User Data scripts
-- Hybrid: Mix golden AMI and User Data (useful on elastic beanstalk)
-RDS Database:
-- Restore from snapshot: schemas and data ready
-EBS Volumes:
-- Restore from snapshot: disk will be formatted and have data ready
-## Elastic Beanstalk
-Managed service to deploy solutions architectures. Most web apps have the same architecture of a ALB + ASG, so Beanstalk does this. We still have full control over the configuration. Beanstalk is free but you pay for underlying resources. 
-
-Components
-`Application`: Collection of Beanstalk components (environments, versions, configurations...)
-`Application Version`: Iteration of your application code
-`Environment`: Collection of AWS resources running an application version, i.e. test, production blah blah
-
-![[Web Server vs Worker.png]]
-Worker, can scale based on the number of SQS messages. Can push messages to SQS queue from another Web Server Tier.
-
-Deployment Modes:
-- Single instance, great for development
-- High availability with load balancer, great for production
-
 # Amazon S3 Buckets
 ---
 ## Lifecycle Rules
@@ -1167,47 +1111,6 @@ Give users an identity to interact with our Web or mobile application.
 - IAM policies are applied to the credentials and are defined in Cognito
 - They can be customized based on the user_id for more control
 - There are default IAM roles for authenticated and guest users
-# Serverless Architectures
---- 
-## Mobile App: To do List
-- Expose REST API with HTTPS
-- Users can directly interact with their own folder in S3
-- Users should authenticate through a managed serverless service
-- Users can write and read to dos, but they mostly read them
-- Database should scale and have high read throughput
-![[Todolist.png]]
-## Hosted Website: Blog
-- Website should scale globally
-- Blogs are rarely written, but often read
-- Most of the website is purely static files, some of it may be dynamic REST API
-- Caching must be implemented where possible
-- Any new users that subscribes should receive a welcome email
-- Any photo uploaded to the blog should have a thumbnail generated
-![[Blog.png]]For the email, we can use DynamoDB streams to stream any new users, have it invoke a lambda function to then send an email via SES (Simple Email Service).
-## Micro Services Architecture
-Not exactly serverless. 
-- Many services interact with each other directly using a REST API
-- Each architecture for each microservices may vary in form and shape
-- We want a microservice architecture so we can have a leaner development lifecycle for each service
-![[Microservices.png]]
-- Each microservice can be designed as you want
-- Synchronous patterns: API Gateway, Load Balancer
-- Asynchronous patterns: SQS, Kinesis, SNS, Lambda S3 Triggers
-
-Challenges with microservices:
-- Repeated overhead for creating each microservice
-- Issues with optimizing server density/utilization
-- Complexity of running multiple versions of multiple microservices simultaneously
-- Proliferation of client side code requirements to integrate with many separate microservices
-Some of these challenges are solved by Serverless Patterns:
-- API Gateway, Lambda scale automatically and you pay per usage
-- Can easily clone API, reproduce environments
-- Generated client SDK through Swagger integration for the API Gateway
-## Software Updates Offloading
-- We have an EC2 application that distributes software updates once in a while
-- When a new software update is out, we get a lot of requests and the content is distributed in mass over the network, its very costly
-- We don't want to change our application, but want to optimize our cost and CPU usage
-- Just use CloudFront to cache the software update files at the edge since software updates are static files
 # Machine Learning
 --- 
 `AWS Rekognition`:
@@ -1884,3 +1787,145 @@ As an example, we want to transfer 200TB of data into the cloud and we have a 10
 - Use Site to Site VPN or DX with DMS or DataSync
 ## VMware Cloud on AWS
 Some customers use VMware Cloud to manage their on premise data centers. They want to extent the data center capacity to AWS, but keep using VMware Cloud. To do so we use VMware Cloud on AWS. 
+# Solution Architectures
+---
+## WhatsTheTime.com
+Stateless Web App
+- We don't need a database
+![[Stateless Webapp.png]]
+## MyClothes.com
+Stateful Web App
+- Allows people to buy clothes online
+- There is a shopping cart
+- Has hundreds of users at the same time
+- We need scaling and keep the web app as stateless as possible
+- Users should not lose their shopping cart
+- Users should have their details stored in a database
+
+How can we keep the shopping cart?
+- We could enable ELB Stickiness so that the shopping cart is stored on the EC2 Instance and thus the user always accesses the same instance
+- We could send shopping cart content as a User Cookie, this way it doesn't matter which EC2 instance is being used the shopping cart is still saved as the cookie. This is a stateless solution but the HTTP requests are heavier, also cookies could be altered, so the EC2 instances should validate the cookies. Cookies can only be 4 KB large.
+- Introduce a Server Session. The cookie only contains the session id. We can store the shopping cart session on ElastiCache, so the EC2 instances receive the web cookie with the session id and store/retrieve the session data (Shopping cart) from the ElastiCache
+![[Stateful Server Session.png]]
+
+Storing User Data
+- We can scale reads by setting up and RDS master and then having read replicas with replication
+- Alternatively we can scale reads by using lazy loading with ElastiCache. I.e. always try reading from the cache, if hit then good, if miss, read from the RDS DB and Store in cache for next time.
+![[Stateful Store User Data.png]]
+![[Stateful Webapp Security Groups.png]]
+## MyWordPress.com
+We are creating a fully scalable WordPress website. We want the website to access and correctly display images. 
+
+We could choose to use aurora for better scaling and performance.
+We can store images in EBS volumes for each instance. Works well for a single EC2 instance, but doesn't work for multiple. Instead we can use an EFS instead. This way we have ENI's in each AZ so the storage is shared between all the instances we have.
+![[Wordpress example.png]]
+## Instantiating Applications Quickly
+EC2 Instances:
+- Use a golden AMI: Install your applications, OS dependencies etc... beforehand and launch your EC2 instances from the Golden AMI
+- Bootstrap using User Data: For dynamic configuration, use User Data scripts
+- Hybrid: Mix golden AMI and User Data (useful on elastic beanstalk)
+RDS Database:
+- Restore from snapshot: schemas and data ready
+EBS Volumes:
+- Restore from snapshot: disk will be formatted and have data ready
+## Elastic Beanstalk
+Managed service to deploy solutions architectures. Most web apps have the same architecture of a ALB + ASG, so Beanstalk does this. We still have full control over the configuration. Beanstalk is free but you pay for underlying resources. 
+
+Components
+`Application`: Collection of Beanstalk components (environments, versions, configurations...)
+`Application Version`: Iteration of your application code
+`Environment`: Collection of AWS resources running an application version, i.e. test, production blah blah
+
+![[Web Server vs Worker.png]]
+Worker, can scale based on the number of SQS messages. Can push messages to SQS queue from another Web Server Tier.
+
+Deployment Modes:
+- Single instance, great for development
+- High availability with load balancer, great for production
+# Serverless Architectures
+--- 
+## Mobile App: To do List
+- Expose REST API with HTTPS
+- Users can directly interact with their own folder in S3
+- Users should authenticate through a managed serverless service
+- Users can write and read to dos, but they mostly read them
+- Database should scale and have high read throughput
+![[Todolist.png]]
+## Hosted Website: Blog
+- Website should scale globally
+- Blogs are rarely written, but often read
+- Most of the website is purely static files, some of it may be dynamic REST API
+- Caching must be implemented where possible
+- Any new users that subscribes should receive a welcome email
+- Any photo uploaded to the blog should have a thumbnail generated
+![[Blog.png]]For the email, we can use DynamoDB streams to stream any new users, have it invoke a lambda function to then send an email via SES (Simple Email Service).
+## Micro Services Architecture
+Not exactly serverless. 
+- Many services interact with each other directly using a REST API
+- Each architecture for each microservices may vary in form and shape
+- We want a microservice architecture so we can have a leaner development lifecycle for each service
+![[Microservices.png]]
+- Each microservice can be designed as you want
+- Synchronous patterns: API Gateway, Load Balancer
+- Asynchronous patterns: SQS, Kinesis, SNS, Lambda S3 Triggers
+
+Challenges with microservices:
+- Repeated overhead for creating each microservice
+- Issues with optimizing server density/utilization
+- Complexity of running multiple versions of multiple microservices simultaneously
+- Proliferation of client side code requirements to integrate with many separate microservices
+Some of these challenges are solved by Serverless Patterns:
+- API Gateway, Lambda scale automatically and you pay per usage
+- Can easily clone API, reproduce environments
+- Generated client SDK through Swagger integration for the API Gateway
+## Software Updates Offloading
+- We have an EC2 application that distributes software updates once in a while
+- When a new software update is out, we get a lot of requests and the content is distributed in mass over the network, its very costly
+- We don't want to change our application, but want to optimize our cost and CPU usage
+- Just use CloudFront to cache the software update files at the edge since software updates are static files
+# More Solutions Architectures
+---
+## High Performance Computing on AWS
+### Data Management and Transfer
+- AWS Direct Connect:
+	- Move GB/s of data to the cloud
+- Snowball and Snowmobile
+	- Move PB of data to the cloud
+- AWS DataSync
+	- Move large amount of data between on premise and S3, EFS, FSx for Windows
+### Compute and Networking
+- EC2 instances:
+	- CPU optimized, GPU optimized
+	- Spot instances and fleets for cost savings and auto scaling
+	- Placement groups of type cluster for good network performance
+- EC2 Enhanced Networking (SR-IOV):
+	- Higher bandwidth and packets per second, lower latency
+	- Option 1: Elastic Network Adapter (ENA) up to 100 Gbps
+	- Option 2: Intel 82599 VF up to 10 Gbps, it is legacy though
+- Elastic Fabric Adapter (EFA):
+	- Improved ENA for HPC, only works for Linux
+	- Great for inter node communications and tightly coupled workloads
+	- Leverages Message Passing Interface (MPI) Standard
+	- Bypasses the underlying Linux OS to provide low latency reliable transport
+### Storage
+- Instance Attached Storage:
+	- EBS: scale up to 256,000 IOPS with io2 Block Express
+	- Instance Store: scale to millions of IOPS, linked to EC2 instances and low latency
+- Network Storage:
+	- S3: large blob, not a file system
+	- EFS: scale IOPS based on total size or use provisioned IOPS
+	- FSx for Lustre: 
+		- HPC optimized distributed file system, millions of IOPS
+		- Backed by S3
+### Automation and Orchestration
+- AWS Batch:
+	- Supports multi node parallel jobs, which enable you to run single jobs that span multiple EC2 instances
+	- Easily schedule jobs and launch EC2 instances accordingly
+- AWS ParallelCluster:
+	- Open source cluster management tool to deploy HPC on AWS
+	- Configure with text files
+	- Automate creation of VPC, subnet, cluster type and instance types
+	- Ability to enable EFA on the cluster
+## Creating a Highly Available EC2 Instance
+![[HA EC2 1.png]]
+![[HA EC2 2.png]]![[HA EC2 3.png]]
