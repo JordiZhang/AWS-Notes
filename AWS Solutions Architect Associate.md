@@ -1752,3 +1752,135 @@ Firewall for the entire VPC, different from WAF. Can inspect traffic in any dire
 - Stateful domain list rule groups
 - General Pattern matching using regex
 Traffic filtering, and allows active flow inspection to protect against network threats with intrusion prevention capabilities. Send logs of rule matches to S3, CloudWatch Logs or Kinesis Data Firehose.
+# Disaster Recovery
+---
+- Recovery Point Objective (RPO): How often do you run backups, essentially how up to date are backups. The maximum time of data loss that could happen
+- Recovery Time Objective (RTO): How much downtime you will have in the event of a disaster.
+## Disaster Recovery Strategies
+`Backup and Restore`:
+- Take backups every x days/hours or whatever other time horizon is required
+- When disaster happens, simply restore the backup
+- High RPO and RTO
+- Cheap
+`Pilot Light`:
+- A small version of your application is always running on the cloud
+- Useful for the critical core
+- Similar to backup and restore but faster because critical systems are already running
+- Lower RTO
+`Warm Standby`:
+- Full system is up and running, but at minimum size
+- Upon disaster, we can scale to production load quickly
+- More expensive
+- Lower RTO, lower than Pilot light
+`Multi Site/Hot Site Approach`:
+- Have full production scale running on AWS and on premise, or simply multiple sites
+- Very expensive
+- Very low RTO, lowest out of these 4 options
+- We could also have all the production on cloud, and use multi region with replication
+## Database Migration Service (DMS)
+Managed service to quickly and securely migrate databases to AWS, it is resilient and self healing. The source database remains available during the migration. Supports Homogeneous migrations and heterogeneous ones. Has continuous data replication using CDC (Change Data Capture). To use DMS, you must create an EC2 instance with the DMS software to perform the replication tasks.
+
+Sources:
+- On premises and EC2 instances databases: Oracle, MS SQL Server, MySQL, MariaDB, PostgreSQL, MongoDB, SAP, DB2
+- Azure databases: Azure SQL Database
+- Amazon RDS: all including Aurora
+- S3
+- DocumentDB
+Targets:
+- On premises and EC2 instances databases
+- RDS
+- Redshift, DynamoDB, S3
+- OpenSearch Service
+- Kinesis Data Streams
+- Apache Kafka
+- DocumentDB and Neptune
+- Redis and Babelfish
+
+AWS Schema Conversion Tool (SCT)
+Converts your database schema from one engine to another, used for heterogeneous migrations.
+
+Multi AZ Deployment
+With this feature enabled, DMS provisions and maintains a synchronous standby replica in a different AZ. Provides data redundancy, eliminates I/O freezes and minimizes latency spikes.
+## RDS & Aurora MySQL Migrations
+RDS MySQL to Aurora MySQL:
+`Option 1`:
+- DB Snapshots from RDS MySQL restored as MySQL Aurora DB
+`Option 2`:
+- Create an Aurora Read Replica from your RDS MySQL. Once replicated, promote it as its own DB cluster, takes time and is costly
+
+External MySQL to Aurora MySQL:
+`Option 1`:
+- Use Percona XtraBackup to create a backup file in Amazon S3
+- Create an Aurora MySQL DB from Amazon S3
+`Option 2`:
+- Create an Aurora MySQL DB
+- Use the mysqldump utility to migrate MySQL into Aurora, slower than S3 method
+
+Use DMS if both databases are up and running, continuous migrations essentially
+
+RDS PostgreSQL to Aurora PostgreSQL:
+`Option 1`:
+- DB Snapshots from RDS PostgreSQL restored as PostgreSQL Aurora DB
+`Option 2`:
+- Create an Aurora Read Replica from your RDS PostgreSQL. Once replicated, promote it as its own DB cluster
+
+External PostgreSQL to Aurora PostgreSQL
+- Create a backup and put it in Amazon S3
+- Import it using the aws_s3 Aurora extension
+## On Premise Strategy with AWS
+- Ability to download Amazon Linux 2 AMI as a VM (.iso format) 
+	- VMWare, KVM,VirtualBox (Oracle VM), Microsoft Hyper-V
+- VM Import / Export 
+	- Migrate existing applications into EC2
+	- Create a DR repository strategy for your on-premise VMs 
+	- Can export back the VMs from EC2 to on-premise 
+- AWS Application Discovery Service 
+	- Gather information about your on-premise servers to plan a migration 
+	- Server utilization and dependency mappings 
+	- Track with AWS Migration Hub 
+- AWS Database Migration Service (DMS) 
+	- Replicate On-premise -> AWS, AWS -> AWS, AWS -> On-premise  
+	- Works with various database technologies (Oracle, MySQL, DynamoDB, etc..) 
+- AWS Application Migration Service (MGN) 
+- Incremental replication of on-premises live servers to AWS
+## AWS Backup
+Fully managed service to centrally manage and automate backups across AWS services. No need to create custom scripts and manual processes. Supported Services:
+- EC2/EBS
+- S3
+- RDS, Aurora, DynamoDB
+- DocumentDB/Neptune
+- EFS/FSx
+- Storage Gateway
+Supports cross region and cross account backups. Supports point in time recovery for supported services. Has on demand and scheduled backups. Tag based backup policies, and you can create backup plans:
+- Backup frequency
+- Backup window
+- Transition to cold storage
+- Retention period
+
+Vault Lock
+Enforce a Write Once Read Many state for all backups that you store in AWS Backup Vault. Additional layer of defense to protect your backups against inadvertent or malicious delete operations and updates that shorten or alter retention periods. Even root user cannot delete backups when enabled.
+## AWS Application Discovery Service
+Service used to plan migration projects to the AWS cloud by gathering information about on premise data centers and applications. Gathers information about server utilization data and dependency mapping. There are 2 types of migrations:
+`Agentless Discovery`:
+- Uses AWS Agentless Discovery Connector
+- Scans for VM inventory, configuration and performance history such as CPU and memory usage
+`Agent Based Discovery`:
+- Uses AWS Application Discovery Agent
+- Scans for System configuration, performance, running processes, and details of the network connections between systems
+Resulting data can be viewed within the AWS Migration Hub
+## AWS Application Migration Service (MGN)
+Lift and Shift (rehost) solution to simplify migrating applications to AWS. Converts your physical, virtual and cloud based servers to run natively on AWS. Continuous replication of your data centers into AWS, first into staging. At some point you do a cutover to move everything into a production environment. Minimal downtime, reduced costs. Also supports a wide range of platforms, Operating Systems and databases.
+## Transferring large amounts of data into AWS
+As an example, we want to transfer 200TB of data into the cloud and we have a 100 Mbps internet connection. 
+`Over the internet/Site to Site VPN`:
+- Takes about 185 days
+`Over direct connect 1Gbps`:
+- Long time for one time setup, about a month
+- Takes 18.5 days to transfer data
+`Over Snowball`:
+- Takes about a week for end to end transfer
+- Can be combined with DMS
+`For ongoing replication/transfers`:
+- Use Site to Site VPN or DX with DMS or DataSync
+## VMware Cloud on AWS
+Some customers use VMware Cloud to manage their on premise data centers. They want to extent the data center capacity to AWS, but keep using VMware Cloud. To do so we use VMware Cloud on AWS. 
