@@ -1787,6 +1787,77 @@ As an example, we want to transfer 200TB of data into the cloud and we have a 10
 - Use Site to Site VPN or DX with DMS or DataSync
 ## VMware Cloud on AWS
 Some customers use VMware Cloud to manage their on premise data centers. They want to extent the data center capacity to AWS, but keep using VMware Cloud. To do so we use VMware Cloud on AWS. 
+# Other Services
+---
+## CloudFormation
+Declarative way of outlining your AWS infrastructure for any resources. You specify a CloudFormation Template and then CloudFormation creates those for you in the right order with the exact configuration you specified. 
+
+Benefits
+Infrastructure as code:
+- No resources are manually created, which is excellent for control
+- Changes to the infrastructure are reviewed through code
+Costs:
+- Each resource within the stack is tagged with an identifier so you can easily see how much a stack costs you
+- You can estimate the costs of your resources using the CloudFormation Template
+- Savings strategy, you can automate deletion of templates and recreated at a later time
+Productivity:
+- Destroy and recreate infrastructure on the fly
+- Automated generation of diagrams for your templates
+- Declarative programming, no need to figure out ordering and orchestration
+- Leverage existing templates on the web
+- Almost everything is supported, but also can use custom resources for ones that aren't supported
+
+Service Roles
+- IAM roles that allow CloudFormation to create/update/delete stack resources on your behalf even if they don't have permissions to work with the resources in the stack
+- Used to achieve the least privilege principle
+- User must have iam:PassRole permissions
+## Simple Email Service (SES)
+Fully managed service to send emails securely, globally and at scale. Allows inbound and outbound emails. Has feature for reputation dashboard, performance insights, anti-spam feedback. Provides statistics such as email deliveries, bounces, feedback loop results and emails opened. Supports DomainKeys Identified Mail (DKIM) and Sender Policy Framework (SPF). Flexible IP deployment: shared, dedicated and customer owned IPs. You can also send emails using your application using AWS console, APIs or SMTP. Used for bulk emails.
+## Amazon Pinpoint
+Scalable 2 way (inbound/outbound) marketing communications service. Supports emails, SMS, push, voice and in app messaging. Ability to segment and personalize messages with the right content to customers. Possibility to receive replies. Scales to billions of messages per day. Think of pinpoint as the more powerful version of SES or SNS.
+## AWS Systems Manager
+Service to centrally manage on premise and on cloud environments. 
+
+Session Manager
+Allows you to start a secure shell on your EC2 instances and on premise servers securely without using SSH access, bastion hosts, or SSH keys, nor port 22 needed.
+
+Run Command
+Allows you to execute a script or just run a single command. Runs commands across multiple instances using resource groups. No need for SSH and command output can be shown in the AWS Console, sent to an S3 bucket or CloudWatch Logs. You can also send notifications to SNS about command status, whether it is in progress, failed or else. It is fully integrated with IAM and CloudTrail and can be invoked using EventBridge.
+
+Patch Manager
+Automates the process of patching managed instances, OS updates, application updates, security updates. Supports EC2 instances and on premise servers. Supports Linus, macOS and Windows. Patch on demand or on a schedule using maintenance Windows. Scan instances and generate patch compliance report to see which ones are missing patches.
+
+Maintenance Windows
+Defines a schedule for when to perform actions on your instances such as OS patching, updating drivers or installing software. Maintenance Windows contain:
+- Schedule
+- Duration
+- Set of registered instances
+- Set of registered tasks
+
+Automation
+Simplifies common maintenance and deployment tasks of EC2 instances and other AWS resources. For example, restarting instances, or creating an AMI. To do so you create a Automation Runbook, which is an SSM Document to define actions performed on your EC2 instances or AWS resources. Can be triggered:
+- Manually using AWS Console, CLI or SDK
+- EventBridge
+- On a schedule using Maintenance Windows
+- By AWS Config for remediation
+## Cost Explorer
+Visualize, understand and manage your AWS costs and usage over time. Allows you to create custom reports to analyze cost and usage data. Most importantly, allows you to forecast usage up to 12 months based on previous usage. Also helpful to choose an optimal savings plan for best cost savings.
+## Cost Anomaly Detection
+Continuously monitor your cost and usage using ML to detect unusual spends. Sends you an anomaly detection report with root cause analysis and notifies you with individual alerts or daily/weekly summaries using SNS.
+## AWS Outposts
+AWS Outposts are server racks that offers the same AWS infrastructure, services, APIs and tools to build your own applications on premises just as in the cloud. AWS will setup and manage the outpost racks within your on premise infrastructure. You are responsible for the physical security of the outpost racks though. Benefits:
+- Low latency access to on premise servers
+- Local data processing
+- Data residency
+- Easier migration from on premise to the cloud
+## AWS Batch
+Managed batch processing at any scale. Efficient run 100,000s of computing batch jobs on AWS. Batch will dynamically launch EC2 instances or Spot instances to run the job and allocates the appropriate memory too. Batch jobs are defined as Docker images and run on ECS. 
+## Amazon AppFlow
+Fully managed integration service that enables you to securely transfer data between SaaS applications and AWS. Sources can be Salesforce, SAP, Zendesk, Slack and others. Destinations are AWS services like S3, Redshift or non AWS services such as SnowFlake and Salesforce. You can schedule the transfer of data, in response to events or on demand. It also has data transformation capabilities like filtering and validation. And it encrypts the data over the public internet or privately over AWS PrivateLink. 
+## AWS Amplify
+Think of it as a set of web and mobile application development tools. Configure backend using the Amplify CLI. Connect frontend to backend using Amplify Frontend Libraries and build using Amplify Console and deploy.
+## Instance Schedule
+Not a service, rather a solution deployed through CloudFormation. Gives you the capability of automatically start/stop your AWS services to reduce costs. Supports EC2 instances, EC2 ASGs and RDS instances. Schedules are managed in a DynamoDB table. Uses resource tags and Lambda to start/stop. Supports cross account and cross region resources. Comes production ready.
 # Solution Architectures
 ---
 ## WhatsTheTime.com
